@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Screeps3D.RoomObjects;
 using Screeps_API;
 using UnityEngine;
@@ -10,6 +11,8 @@ namespace Screeps3D.Rooms
     {
         private Room _room;
         private List<string> _removeList = new List<string>();
+        private List<string> flagList = new List<string>();
+        private List<string> activeFlagList = new List<string>();
 
         public Action<Room,JSONObject> OnUnpack;
 
@@ -120,6 +123,8 @@ namespace Screeps3D.Rooms
         private void UnpackFlags(JSONObject roomData)
         {
             var flagsData = roomData["flags"];
+            flagList.Clear();
+            activeFlagList.Clear();
             if (flagsData == null)
                 return;
 
@@ -135,9 +140,41 @@ namespace Screeps3D.Rooms
                 var dataArray = flagStr.Split('~');
                 if (dataArray.Length < 5)
                     continue;
+                flagList.Add(dataArray[0]);
                 var flag = ObjectManager.Instance.GetFlag(dataArray);
                 flag.FlagDelta(dataArray, _room);
                 _room.Objects[flag.Name] = flag;
+            }
+            
+            // process existing flag deltas
+            _removeList.Clear();
+            foreach (var kvp in _room.Objects.Values.OfType<Flag>().ToList())
+            {
+                
+                var id = kvp.Id;
+                var flagObject = kvp;
+
+                if (flagList.Contains(id))
+                {
+                    activeFlagList.Add(id);
+
+                }
+                else if (flagObject.Room != _room)
+                {
+                    _removeList.Add(id);
+                    continue;
+                }
+                
+                if (!activeFlagList.Contains(id))
+                {
+                    flagObject.HideObject(_room);
+                    _removeList.Add(id);
+                }
+            }
+            
+            foreach (var id in _removeList)
+            {
+                _room.Objects.Remove(id);
             }
         }
     }
