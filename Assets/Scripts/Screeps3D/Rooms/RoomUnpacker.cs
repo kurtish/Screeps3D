@@ -11,8 +11,6 @@ namespace Screeps3D.Rooms
     {
         private Room _room;
         private List<string> _removeList = new List<string>();
-        private List<string> flagList = new List<string>();
-        private List<string> activeFlagList = new List<string>();
 
         public Action<Room,JSONObject> OnUnpack;
 
@@ -30,6 +28,7 @@ namespace Screeps3D.Rooms
             UnpackUsers(roomData);
             UnpackFlags(roomData);
             UnpackObjects(roomData);
+            RemoveObjects();
 
             OnUnpack?.Invoke(_room, roomData);
         }
@@ -53,7 +52,6 @@ namespace Screeps3D.Rooms
             }
 
             // process existing object deltas
-            _removeList.Clear();
             foreach (var kvp in _room.Objects)
             {
                 var id = kvp.Key;
@@ -83,11 +81,6 @@ namespace Screeps3D.Rooms
                 {
                     roomObject.Delta(objectData, _room);
                 }
-            }
-
-            foreach (var id in _removeList)
-            {
-                _room.Objects.Remove(id);
             }
         }
 
@@ -122,9 +115,9 @@ namespace Screeps3D.Rooms
         // "swarm_W3N7s~4~9~25~25|intel_nsa~4~9~25~25|control_W3N7c~4~9~25~25"
         private void UnpackFlags(JSONObject roomData)
         {
+            List<string> flagNameList = new List<string>();
+            List<string> activeFlagsList = new List<string>();
             var flagsData = roomData["flags"];
-            flagList.Clear();
-            activeFlagList.Clear();
             if (flagsData == null)
                 return;
 
@@ -140,32 +133,26 @@ namespace Screeps3D.Rooms
                 var dataArray = flagStr.Split('~');
                 if (dataArray.Length < 5)
                     continue;
-                flagList.Add(dataArray[0]);
+                flagNameList.Add(dataArray[0]);
                 var flag = ObjectManager.Instance.GetFlag(dataArray);
                 flag.FlagDelta(dataArray, _room);
                 _room.Objects[flag.Name] = flag;
             }
             
             // process existing flag deltas
-            _removeList.Clear();
             foreach (var kvp in _room.Objects.Values.OfType<Flag>().ToList())
             {
                 
                 var id = kvp.Id;
                 var flagObject = kvp;
 
-                if (flagList.Contains(id))
+                if (flagNameList.Contains(id))
                 {
-                    activeFlagList.Add(id);
+                    activeFlagsList.Add(id);
 
                 }
-                else if (flagObject.Room != _room)
-                {
-                    _removeList.Add(id);
-                    continue;
-                }
                 
-                if (!activeFlagList.Contains(id))
+                if (!activeFlagsList.Contains(id))
                 {
                     flagObject.HideObject(_room);
                     _removeList.Add(id);
@@ -176,6 +163,15 @@ namespace Screeps3D.Rooms
             {
                 _room.Objects.Remove(id);
             }
+        }
+
+        private void RemoveObjects()
+        {
+            foreach (var id in _removeList)
+            {
+                _room.Objects.Remove(id);
+            }
+            _removeList.Clear();
         }
     }
 }
